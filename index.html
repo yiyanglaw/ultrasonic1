@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultrasonic Sensor Distance</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Ultrasonic Sensor Distance</h1>
+    <button id="get-distance-btn">Get Distance</button>
+    <p id="distance">Distance: Not yet measured</p>
+
+    <script>
+        $(document).ready(function() {
+            $('#get-distance-btn').click(function() {
+                $.get("/get_distance", function(data) {
+                    if (data.distance) {
+                        $('#distance').text("Distance: " + data.distance + " cm");
+                    } else {
+                        $('#distance').text("Error: " + data.error);
+                    }
+                }).fail(function() {
+                    $('#distance').text("Error: Could not reach the Raspberry Pi.");
+                });
+            });
+        });
+    </script>
+</body>
+</html>
