@@ -4,7 +4,7 @@ import paho.mqtt.client as mqtt
 app = Flask(__name__)
 
 # MQTT Setup
-MQTT_BROKER = "mqtt.eclipse.org"
+MQTT_BROKER = "broker.hivemq.com"  # Use HiveMQ broker
 MQTT_PORT = 1883
 MQTT_TOPIC = "raspberrypi/sensor/distance"
 mqtt_client = mqtt.Client()
