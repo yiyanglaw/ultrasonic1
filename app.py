@@ -1,93 +1,47 @@
-import RPi.GPIO as GPIO
-import time
-import paho.mqtt.client as mqtt
 from flask import Flask, render_template, jsonify
+import paho.mqtt.client as mqtt
 import os
 
-# Flask app setup, specify current directory for templates
-app = Flask(__name__, template_folder=os.getcwd())
+app = Flask(__name__, template_folder=os.getcwd())  # Set template folder to the current directory
 
 # MQTT Setup
-MQTT_BROKER = "broker.hivemq.com"
+MQTT_BROKER = "mqtt.eclipse.org"
 MQTT_PORT = 1883
-MQTT_TOPIC = "raspberrypi/servo/control"
-
-# Ultrasonic Sensor Pins
-TRIG = 23
-ECHO = 24
-
-# Servo Pin (GPIO 17 for example)
-SERVO_PIN = 17
-
-# GPIO Setup
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(TRIG, GPIO.OUT)
-GPIO.setup(ECHO, GPIO.IN)
-GPIO.setup(SERVO_PIN, GPIO.OUT)
-
-# Initialize PWM for Servo
-servo = GPIO.PWM(SERVO_PIN, 50)  # 50Hz
-servo.start(0)
-
-# MQTT Client Setup
+MQTT_TOPIC = "raspberrypi/sensor/distance"
 mqtt_client = mqtt.Client()
 
+# Variable to store the last received distance
+current_distance = None
+
+# MQTT Callbacks
 def on_connect(client, userdata, flags, rc):
     print(f"Connected to MQTT Broker with result code {rc}")
     client.subscribe(MQTT_TOPIC)
 
 def on_message(client, userdata, msg):
-    message = msg.payload.decode()
-    print(f"Message received: {message}")
-    if message == "open":
-        # Move servo to open position
-        servo.ChangeDutyCycle(7)
-        time.sleep(1)
-        servo.ChangeDutyCycle(0)
-    elif message == "close":
-        # Move servo to close position
-        servo.ChangeDutyCycle(3)
-        time.sleep(1)
-        servo.ChangeDutyCycle(0)
+    global current_distance
+    try:
+        current_distance = float(msg.payload.decode())
+        print(f"Received message: {current_distance} cm")
+    except Exception as e:
+        print(f"Error processing message: {e}")
 
+# Connect to MQTT broker and set callbacks
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 mqtt_client.loop_start()
 
-# Function to get ultrasonic sensor distance
-def get_distance():
-    GPIO.output(TRIG, GPIO.LOW)
-    time.sleep(0.5)
-    
-    GPIO.output(TRIG, GPIO.HIGH)
-    time.sleep(0.00001)
-    GPIO.output(TRIG, GPIO.LOW)
-    
-    while GPIO.input(ECHO) == GPIO.LOW:
-        pulse_start = time.time()
-    
-    while GPIO.input(ECHO) == GPIO.HIGH:
-        pulse_end = time.time()
-    
-    pulse_duration = pulse_end - pulse_start
-    distance = pulse_duration * 17150  # Distance in cm
-    distance = round(distance, 2)
-    
-    return distance
-
 @app.route('/')
 def index():
-    distance = get_distance()
-    return render_template('index.html', distance=distance)
+    return render_template('index.html')  # Render index.html stored in the same directory as app.py
 
-@app.route('/control_servo/<action>')
-def control_servo(action):
-    if action == 'open':
-        mqtt_client.publish(MQTT_TOPIC, "open")
-    elif action == 'close':
-        mqtt_client.publish(MQTT_TOPIC, "close")
-    return jsonify({'status': 'success', 'action': action})
+@app.route('/get_distance', methods=['GET'])
+def get_distance():
+    if current_distance is not None:
+        return jsonify(distance=current_distance)
+    else:
+        return jsonify({"error": "No data available from Raspberry Pi"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)
